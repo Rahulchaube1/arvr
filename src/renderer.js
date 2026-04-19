@@ -54,8 +54,20 @@ export class Renderer {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    _animate() {
+            _animate() {
         requestAnimationFrame(() => this._animate());
+        if (this.autoRotate) {
+             if (!this.orbitAngle) {
+                 this.orbitAngle = 0;
+                 this.camera.position.set(0, 0, 0); // start here
+             }
+             this.orbitAngle += 0.01;
+             this.camera.position.x = Math.sin(this.orbitAngle) * 3;
+             this.camera.position.z = -3 + Math.cos(this.orbitAngle) * 3;
+             this.camera.lookAt(0, 0, -3);
+        } else {
+             this.orbitAngle = 0;
+        }
         this.renderer.render(this.scene, this.camera);
     }
 
@@ -79,7 +91,35 @@ export class Renderer {
     }
 
     /** Return a data-URL of the current canvas frame (PNG). */
+    setVREnvironment(enabled) {
+        if (!this.stars) {
+            const geo = new THREE.BufferGeometry();
+            const pts = [];
+            for (let i = 0; i < 3000; i++) {
+                pts.push(
+                    (Math.random() - 0.5) * 100,
+                    (Math.random() - 0.5) * 100,
+                    (Math.random() - 0.5) * 100
+                );
+            }
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+            const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.15 });
+            this.stars = new THREE.Points(geo, mat);
+        }
+        
+        if (enabled) {
+            this.scene.add(this.stars);
+            this.renderer.setClearColor(0x050510, 1.0); // solid background
+        } else {
+            this.scene.remove(this.stars);
+            this.renderer.setClearColor(0x000000, 0); // transparent (shows webcam)
+        }
+    }
+
+    /** Return a data-URL of the current canvas frame (PNG). */
     getScreenshot() {
         return this.canvas.toDataURL('image/png');
     }
 }
+
+

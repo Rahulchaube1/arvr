@@ -6,37 +6,37 @@
  * Exposed on window.gmdraw for HTML onclick handlers.
  */
 
-import { Renderer }              from './renderer.js';
-import { DrawingEngine }         from './drawing.js';
-import { GestureProcessor }      from './gestures.js';
-import { AIProcessor }           from './aiProcessor.js';
-import { VoiceCommands }         from './voiceCommands.js';
-import { CollaborationManager }  from './collaboration.js';
-import { PersistenceManager }    from './persistence.js';
-import { NotificationSystem }    from './notifications.js';
+import { Renderer } from './renderer.js';
+import { DrawingEngine } from './drawing.js';
+import { GestureProcessor } from './gestures.js';
+import { AIProcessor } from './aiProcessor.js';
+import { VoiceCommands } from './voiceCommands.js';
+import { CollaborationManager } from './collaboration.js';
+import { PersistenceManager } from './persistence.js';
+import { NotificationSystem } from './notifications.js';
 
 // ─── Size presets ─────────────────────────────────────────────────────────────
 const SIZE_PRESETS = { small: 0.006, medium: 0.015, large: 0.030, xl: 0.055 };
 
 class GMDrawApp {
     constructor() {
-        this.notify       = new NotificationSystem();
-        this.renderer     = null;
-        this.drawing      = null;
-        this.gestures     = null;
-        this.ai           = null;
-        this.voice        = null;
-        this.collab       = null;
-        this.persistence  = null;
+        this.notify = new NotificationSystem();
+        this.renderer = null;
+        this.drawing = null;
+        this.gestures = null;
+        this.ai = null;
+        this.voice = null;
+        this.collab = null;
+        this.persistence = null;
 
         // Gesture state
-        this._isStarted    = false;
-        this._eraserMode   = false; // temporary eraser via gesture
-        this._savedTool    = 'pen';
-        this._lastUndoAt   = 0;
+        this._isStarted = false;
+        this._eraserMode = false; // temporary eraser via gesture
+        this._savedTool = 'pen';
+        this._lastUndoAt = 0;
 
         // Remote peer cursors  userId → THREE.Mesh
-        this._peerCursors  = new Map();
+        this._peerCursors = new Map();
 
         this._bindWindowAPI();
     }
@@ -46,46 +46,70 @@ class GMDrawApp {
     async start() {
         const startBtn = document.getElementById('start-btn');
         startBtn.disabled = true;
-        startBtn.innerHTML = `<span class="animate-spin inline-block mr-2">⏳</span> Starting…`;
+        const updateStatus = (msg) => {
+            console.log(msg);
+            startBtn.innerHTML = `<span class="animate-spin inline-block mr-2">⏳</span> ${msg}`;
+        };
+
+        const timeoutPromise = (promise, ms, desc) => {
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout: ${desc}`)), ms))
+            ]);
+        };
 
         try {
+            updateStatus('Starting Camera...');
             // 1. Camera stream
-            const stream = await navigator.mediaDevices.getUserMedia({
+            const stream = await timeoutPromise(navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'user', width: 1280, height: 720 },
-            });
+            }), 10000, 'getUserMedia (Please accept camera permissions)');
+
+            updateStatus('Loading Video Stream...');
             const video = document.getElementById('webcam-video');
             video.srcObject = stream;
-            await new Promise(r => { video.onloadedmetadata = () => { video.play(); r(); }; });
+            await timeoutPromise(new Promise(r => {
+                video.onloadedmetadata = () => { video.play().catch(e => console.warn(e)); r(); };
+                if (video.readyState >= 1) { video.play().catch(e => console.warn(e)); r(); }
+            }), 5000, 'Video metadata load');
 
+            updateStatus('Initializing 3D Engine...');
             // 2. Three.js scene
             this.renderer = new Renderer('ar-canvas');
-
-            // 3. Drawing engine
             this.drawing = new DrawingEngine(this.renderer);
-
-            // 4. AI processor
             this.ai = new AIProcessor();
 
+            updateStatus('Loading AI Hand Tracking...');
             // 5. Gesture processor
             this.gestures = new GestureProcessor(video, g => this._onGesture(g));
-            await this.gestures.init();
-            this.gestures.start();
+            // Don't await hands.initialize() here to prevent hanging if CDN is slow
+            this.gestures.init().catch(e => console.warn('AI Hand tracking delayed init:', e));
 
-            // 6. Persistence (IndexedDB) – offer to restore last session
+            updateStatus('Starting Camera Processing...');
+            this.gestures.start(); // MediaPipe Camera starts async
+
+            updateStatus('Initializing Storage...');
+            // 6. Persistence (IndexedDB)
             this.persistence = new PersistenceManager(this.drawing);
-            const saved = await this.persistence.init();
-            if (saved?.scene?.strokes?.length) this._offerRestore(saved);
+            try {
+                // If IndexedDB is blocked (e.g. Brave Shields / Private Mode), this can hang.
+                const saved = await timeoutPromise(this.persistence.init(), 2000, 'IndexedDB init');
+                if (saved?.scene?.strokes?.length) this._offerRestore(saved);
+            } catch (e) {
+                console.warn('Storage disabled or timed out:', e);
+            }
 
-            // 7. Collaboration
+            updateStatus('Starting Collaboration...');
             this.collab = new CollaborationManager(this.drawing, e => this._onCollabEvent(e));
 
-            // 8. Voice commands (Phase 4)
+            // 8. Voice commands
             this.voice = new VoiceCommands(c => this._onVoiceCommand(c));
             if (this.voice.init()) {
                 document.getElementById('voice-btn')?.classList.remove('hidden');
                 this.notify.info('🎤 Voice commands ready — say "help"', 4000);
             }
 
+            updateStatus('Ready');
             // 9. Show main UI
             this._showMainUI();
             this._isStarted = true;
@@ -93,7 +117,7 @@ class GMDrawApp {
         } catch (err) {
             console.error('GMDraw start error:', err);
             startBtn.disabled = false;
-            startBtn.textContent = '⚠️ ' + (err.name === 'NotAllowedError' ? 'Camera permission denied' : err.message);
+            startBtn.textContent = '⚠️ ' + err.message;
         }
     }
 
@@ -214,8 +238,8 @@ class GMDrawApp {
     }
 
     _enterEraserMode() {
-        this._eraserMode  = true;
-        this._savedTool   = this.drawing.brushType;
+        this._eraserMode = true;
+        this._savedTool = this.drawing.brushType;
         this.drawing.setBrushType('eraser');
         this._updateToolUI('eraser');
     }
@@ -316,8 +340,8 @@ class GMDrawApp {
 
     _updatePeerCursor(userId, pos, color) {
         if (!this._peerCursors.has(userId)) {
-            const geo  = new THREE.SphereGeometry(0.02, 8, 8);
-            const mat  = new THREE.MeshBasicMaterial({ color: color ?? 0x5ac8fa, transparent: true, opacity: 0.75 });
+            const geo = new THREE.SphereGeometry(0.02, 8, 8);
+            const mat = new THREE.MeshBasicMaterial({ color: color ?? 0x5ac8fa, transparent: true, opacity: 0.75 });
             const mesh = new THREE.Mesh(geo, mat);
             this.renderer.scene.add(mesh);
             this._peerCursors.set(userId, mesh);
@@ -348,8 +372,8 @@ class GMDrawApp {
                 break;
             case 'rectangle':
                 pts = [
-                    new THREE.Vector3(-0.7, -0.4, z), new THREE.Vector3( 0.7, -0.4, z),
-                    new THREE.Vector3( 0.7,  0.4, z), new THREE.Vector3(-0.7,  0.4, z),
+                    new THREE.Vector3(-0.7, -0.4, z), new THREE.Vector3(0.7, -0.4, z),
+                    new THREE.Vector3(0.7, 0.4, z), new THREE.Vector3(-0.7, 0.4, z),
                     new THREE.Vector3(-0.7, -0.4, z),
                 ];
                 break;
@@ -357,7 +381,7 @@ class GMDrawApp {
                 const r = 0.55;
                 pts = [
                     new THREE.Vector3(0, r, z),
-                    new THREE.Vector3( r * 0.866, -r * 0.5, z),
+                    new THREE.Vector3(r * 0.866, -r * 0.5, z),
                     new THREE.Vector3(-r * 0.866, -r * 0.5, z),
                     new THREE.Vector3(0, r, z),
                 ];
@@ -383,8 +407,8 @@ class GMDrawApp {
 
     _offerRestore(session) {
         const count = session.scene.strokes.length;
-        const bar   = document.createElement('div');
-        bar.id      = 'restore-bar';
+        const bar = document.createElement('div');
+        bar.id = 'restore-bar';
         bar.innerHTML = `
             <span>Restore last session? (${count} stroke${count !== 1 ? 's' : ''})</span>
             <div class="flex gap-2">
@@ -467,8 +491,8 @@ class GMDrawApp {
                 this.drawing?.setBrushSize(values[sliderVal - 1] ?? SIZE_PRESETS.medium);
             },
 
-            undo:  () => { this.drawing?.undo();    this.notify.info('↩ Undo', 1000); },
-            redo:  () => { this.drawing?.redo();    this.notify.info('↪ Redo', 1000); },
+            undo: () => { this.drawing?.undo(); this.notify.info('↩ Undo', 1000); },
+            redo: () => { this.drawing?.redo(); this.notify.info('↪ Redo', 1000); },
             clear: () => {
                 this.drawing?.clearAll();
                 this.collab?.broadcastClear();
@@ -488,9 +512,9 @@ class GMDrawApp {
                 }
             },
 
-            exportJSON: () => { this.persistence?.exportJSON();              this.notify.success('💾 JSON exported!'); },
-            exportPNG:  () => { this.persistence?.exportPNG(this.renderer);  this.notify.success('🖼️ PNG exported!');  },
-            exportSVG:  () => { this.persistence?.exportSVG();               this.notify.success('📐 SVG exported!');  },
+            exportJSON: () => { this.persistence?.exportJSON(); this.notify.success('💾 JSON exported!'); },
+            exportPNG: () => { this.persistence?.exportPNG(this.renderer); this.notify.success('🖼️ PNG exported!'); },
+            exportSVG: () => { this.persistence?.exportSVG(); this.notify.success('📐 SVG exported!'); },
 
             importFile: () => {
                 const inp = Object.assign(document.createElement('input'), { type: 'file', accept: '.json' });
@@ -515,7 +539,7 @@ class GMDrawApp {
                 if (input === null) return; // cancelled
                 const code = (input.trim() || this._randomCode()).toUpperCase();
                 this.collab?.joinRoom(code);
-                document.getElementById('room-code').textContent  = code;
+                document.getElementById('room-code').textContent = code;
                 document.getElementById('collab-status').classList.remove('hidden');
                 this.notify.success(`🔗 Joined room ${code}`);
             },
@@ -591,17 +615,17 @@ class GMDrawApp {
                 </div>`;
 
             document.body.appendChild(overlay);
-            const inp    = overlay.querySelector('#_modal_inp');
-            const okBtn  = overlay.querySelector('#_modal_ok');
+            const inp = overlay.querySelector('#_modal_inp');
+            const okBtn = overlay.querySelector('#_modal_ok');
             const canBtn = overlay.querySelector('#_modal_cancel');
             inp.focus();
             inp.select();
 
             const close = val => { overlay.remove(); resolve(val); };
-            okBtn.addEventListener('click',  () => close(inp.value));
+            okBtn.addEventListener('click', () => close(inp.value));
             canBtn.addEventListener('click', () => close(null));
             inp.addEventListener('keydown', e => {
-                if (e.key === 'Enter')  close(inp.value);
+                if (e.key === 'Enter') close(inp.value);
                 if (e.key === 'Escape') close(null);
             });
         });
@@ -611,4 +635,4 @@ class GMDrawApp {
 
 // Bootstrap
 const app = new GMDrawApp();
-document.getElementById('start-btn').addEventListener('click', () => app.start());
+app.start();

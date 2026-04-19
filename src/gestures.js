@@ -15,10 +15,10 @@
  */
 export class GestureProcessor {
     constructor(videoElement, onGesture) {
-        this.video     = videoElement;
+        this.video = videoElement;
         this.onGesture = onGesture;
-        this._hands    = null;
-        this._cam      = null;
+        this._hands = null;
+        this._cam = null;
     }
 
     async init() {
@@ -26,12 +26,13 @@ export class GestureProcessor {
             locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
         });
         this._hands.setOptions({
-            maxNumHands:           1,
-            modelComplexity:       1,
+            maxNumHands: 1,
+            modelComplexity: 1,
             minDetectionConfidence: 0.70,
-            minTrackingConfidence:  0.65,
+            minTrackingConfidence: 0.65,
         });
         this._hands.onResults(r => this._onResults(r));
+
     }
 
     start() {
@@ -39,8 +40,8 @@ export class GestureProcessor {
             onFrame: async () => {
                 if (this._hands) await this._hands.send({ image: this.video });
             },
-            width:  1280,
-            height:  720,
+            width: 1280,
+            height: 720,
         });
         this._cam.start();
     }
@@ -57,16 +58,16 @@ export class GestureProcessor {
             return;
         }
 
-        const lm   = results.multiHandLandmarks[0];
+        const lm = results.multiHandLandmarks[0];
         const type = this._classify(lm);
 
         this.onGesture({
             type,
-            landmarks:  lm,
-            indexTip:   lm[8],
-            thumbTip:   lm[4],
-            middleTip:  lm[12],
-            wrist:      lm[0],
+            landmarks: lm,
+            indexTip: lm[8],
+            thumbTip: lm[4],
+            middleTip: lm[12],
+            wrist: lm[0],
             handedness: results.multiHandedness?.[0]?.label ?? 'Right',
         });
     }
@@ -79,18 +80,18 @@ export class GestureProcessor {
         const pinchDist = this._dist3(thumbTip, indexTip);
         if (pinchDist < 0.055) return 'pinch';
 
-        const indexUp  = this._fingerUp(lm, 8, 6);
+        const indexUp = this._fingerUp(lm, 8, 6);
         const middleUp = this._fingerUp(lm, 12, 10);
-        const ringUp   = this._fingerUp(lm, 16, 14);
-        const pinkyUp  = this._fingerUp(lm, 20, 18);
+        const ringUp = this._fingerUp(lm, 16, 14);
+        const pinkyUp = this._fingerUp(lm, 20, 18);
 
         const upCount = [indexUp, middleUp, ringUp, pinkyUp].filter(Boolean).length;
 
-        if (upCount === 0)                                 return 'fist';
-        if (upCount === 4)                                 return 'open';
-        if (indexUp && middleUp && !ringUp && !pinkyUp)   return 'two_fingers';
-        if (indexUp && middleUp && ringUp  && !pinkyUp)   return 'three_fingers';
-        if (indexUp && !middleUp && !ringUp && !pinkyUp)  return 'point';
+        if (upCount === 0) return 'fist';
+        if (upCount === 4) return 'open';
+        if (indexUp && middleUp && !ringUp && !pinkyUp) return 'two_fingers';
+        if (indexUp && middleUp && ringUp && !pinkyUp) return 'three_fingers';
+        if (indexUp && !middleUp && !ringUp && !pinkyUp) return 'point';
 
         return 'neutral';
     }

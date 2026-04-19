@@ -219,9 +219,7 @@ export class DrawingEngine {
     _buildMesh(pts, color, size, type) {
         if (!pts || pts.length < 2) return null;
 
-        const radius = type === 'marker' ? size * 2.2
-                     : type === 'brush'  ? size * 1.8
-                     : size;
+        const radius = type === 'marker' ? size * 2.2 : (type === 'brush' || type === 'neon' || type === 'particles') ? size * 1.8 : size;
 
         try {
             if (pts.length === 2) {
@@ -237,15 +235,34 @@ export class DrawingEngine {
                 return mesh;
             }
 
-            const curve    = new THREE.CatmullRomCurve3(pts);
+                        const curve    = new THREE.CatmullRomCurve3(pts);
             const segments = Math.min(Math.max(pts.length * 3, 12), 300);
-            const geo = new THREE.TubeGeometry(curve, segments, radius, 7, false);
-            const mat = new THREE.MeshBasicMaterial({
-                color,
-                transparent: type === 'brush',
-                opacity:     type === 'brush' ? 0.72 : 1.0,
-            });
-            return new THREE.Mesh(geo, mat);
+
+            if (type === 'particles') {
+                const pGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(segments * 2));
+                const pMat = new THREE.PointsMaterial({ color, size: radius * 3, sizeAttenuation: true, transparent: true, opacity: 0.8 });
+                return new THREE.Points(pGeo, pMat);
+            }
+
+            const geo = new THREE.TubeGeometry(curve, segments, radius, type === 'neon' ? 12 : 7, false);
+            
+            let mat;
+            if (type === 'neon') {
+                mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
+                const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const coreMesh = new THREE.Mesh(new THREE.TubeGeometry(curve, segments, radius * 0.4, 6, false), coreMat);
+                const group = new THREE.Group();
+                group.add(new THREE.Mesh(geo, mat));
+                group.add(coreMesh);
+                return group;
+            } else {
+                mat = new THREE.MeshBasicMaterial({
+                    color,
+                    transparent: type === 'brush',
+                    opacity:     type === 'brush' ? 0.72 : 1.0,
+                });
+                return new THREE.Mesh(geo, mat);
+            }
         } catch {
             // Fallback: basic line
             const geo = new THREE.BufferGeometry().setFromPoints(pts);
@@ -334,3 +351,4 @@ export class DrawingEngine {
         return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
     }
 }
+

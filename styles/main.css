@@ -1,5 +1,9 @@
 /* ─── Base ─────────────────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
 
 body {
     margin: 0;
@@ -17,7 +21,8 @@ body {
     height: 100vh;
     object-fit: cover;
     z-index: 1;
-    transform: scaleX(-1); /* mirror for natural interaction */
+    transform: scaleX(-1);
+    /* mirror for natural interaction */
 }
 
 #ar-canvas {
@@ -36,7 +41,10 @@ body {
     z-index: 10;
     pointer-events: none;
 }
-.interactive { pointer-events: auto; }
+
+.interactive {
+    pointer-events: auto;
+}
 
 /* ─── Glass panel ──────────────────────────────────────────────────────────── */
 .glass {
@@ -61,7 +69,10 @@ body {
     justify-content: center;
     max-width: 98vw;
 }
-#toolbar.visible { display: flex; }
+
+#toolbar.visible {
+    display: flex;
+}
 
 /* ─── Left side-panel (color + tools) ─────────────────────────────────────── */
 #side-panel {
@@ -80,12 +91,13 @@ body {
 .divider {
     width: 1px;
     height: 36px;
-    background: rgba(255,255,255,0.12);
+    background: rgba(255, 255, 255, 0.12);
 }
+
 .divider-h {
     height: 1px;
     width: 100%;
-    background: rgba(255,255,255,0.12);
+    background: rgba(255, 255, 255, 0.12);
     margin: 4px 0;
 }
 
@@ -99,9 +111,16 @@ body {
     transition: transform 0.15s, border-color 0.15s;
     outline: none;
 }
-.color-btn:hover   { transform: scale(1.18); }
+
+.color-btn:hover {
+    transform: scale(1.18);
+}
+
 .color-btn.active,
-.color-btn.ring-2  { border-color: #fff; transform: scale(1.18); }
+.color-btn.ring-2 {
+    border-color: #fff;
+    transform: scale(1.18);
+}
 
 /* ─── Tool buttons ─────────────────────────────────────────────────────────── */
 .tool-btn {
@@ -114,37 +133,70 @@ body {
     cursor: pointer;
     border: 1px solid transparent;
     background: transparent;
-    color: rgba(255,255,255,0.75);
+    color: rgba(255, 255, 255, 0.75);
     font-size: 11px;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
     outline: none;
     line-height: 1;
 }
-.tool-btn:hover  { background: rgba(255,255,255,0.10); color: #fff; }
-.tool-btn.ring-2 { background: rgba(255,255,255,0.18); color: #fff; border-color: rgba(255,255,255,0.40); }
-.tool-btn svg    { flex-shrink: 0; }
+
+.tool-btn:hover {
+    background: rgba(255, 255, 255, 0.10);
+    color: #fff;
+}
+
+.tool-btn.ring-2 {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.40);
+}
+
+.tool-btn svg {
+    flex-shrink: 0;
+}
 
 /* ─── Toggle switch ────────────────────────────────────────────────────────── */
-.toggle-wrap { position: relative; display: inline-block; width: 42px; height: 24px; }
-.toggle-wrap input          { opacity: 0; width: 0; height: 0; }
+.toggle-wrap {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 24px;
+}
+
+.toggle-wrap input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
 .toggle-track {
-    position: absolute; inset: 0;
-    background: rgba(255,255,255,0.15);
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 999px;
     transition: background 0.25s;
     cursor: pointer;
 }
+
 .toggle-thumb {
     position: absolute;
-    top: 3px; left: 3px;
-    width: 18px; height: 18px;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
     background: #fff;
     border-radius: 50%;
     transition: transform 0.25s;
     pointer-events: none;
 }
-.toggle-wrap input:checked ~ .toggle-track  { background: #007aff; }
-.toggle-wrap input:checked ~ .toggle-thumb  { transform: translateX(18px); }
+
+.toggle-wrap input:checked~.toggle-track {
+    background: #007aff;
+}
+
+.toggle-wrap input:checked~.toggle-thumb {
+    transform: translateX(18px);
+}
 
 /* ─── Gesture HUD (top centre) ─────────────────────────────────────────────── */
 #gesture-hud {
@@ -154,10 +206,10 @@ body {
     transform: translateX(-50%);
     font-size: 13px;
     font-weight: 600;
-    color: rgba(255,255,255,0.70);
+    color: rgba(255, 255, 255, 0.70);
     pointer-events: none;
     letter-spacing: 0.04em;
-    text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
     white-space: nowrap;
 }
 
@@ -172,7 +224,7 @@ body {
     transition: opacity 0.3s;
     pointer-events: none;
     font-weight: 600;
-    text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
 }
 
 /* ─── Restore bar ──────────────────────────────────────────────────────────── */
@@ -187,11 +239,11 @@ body {
     gap: 14px;
     padding: 12px 20px;
     background: rgba(10, 18, 35, 0.92);
-    border: 1px solid rgba(255,255,255,0.12);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 16px;
     backdrop-filter: blur(14px);
     font-size: 14px;
-    color: rgba(255,255,255,0.85);
+    color: rgba(255, 255, 255, 0.85);
     white-space: nowrap;
 }
 
@@ -214,19 +266,42 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.82);
+    background: rgba(0, 0, 0, 0.82);
     backdrop-filter: blur(8px);
     pointer-events: auto;
 }
 
+#start-overlay.hidden {
+    display: none !important;
+}
+
 /* ─── Scrollbar (export / session panel) ──────────────────────────────────── */
-.custom-scroll::-webkit-scrollbar { width: 4px; }
-.custom-scroll::-webkit-scrollbar-track  { background: transparent; }
-.custom-scroll::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.2); border-radius: 4px; }
+.custom-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
 
 /* ─── Responsive tweaks ────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-    #side-panel   { display: none; }
-    #toolbar      { bottom: 12px; padding: 10px 12px; gap: 10px; }
-    .tool-btn     { padding: 6px 8px; }
+    #side-panel {
+        display: none;
+    }
+
+    #toolbar {
+        bottom: 12px;
+        padding: 10px 12px;
+        gap: 10px;
+    }
+
+    .tool-btn {
+        padding: 6px 8px;
+    }
 }

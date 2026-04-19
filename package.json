@@ -1,0 +1,11 @@
+{
+  "name": "gmdraw",
+  "version": "1.0.0",
+  "description": "GMDraw – Spatial AI-Powered Augmented Reality Drawing Platform",
+  "scripts": {
+    "start": "npx serve . --listen 8080 --no-clipboard",
+    "dev":   "npx serve . --listen 8080"
+  },
+  "keywords": ["ar", "augmented-reality", "hand-tracking", "mediapipe", "threejs", "spatial-computing"],
+  "license": "MIT"
+}

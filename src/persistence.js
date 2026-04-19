@@ -97,7 +97,7 @@ export class PersistenceManager {
             const sw  = Math.max(1, s.brushSize * 120).toFixed(1);
             const d   = s.points.map((p, i) => {
                 // Simple orthographic projection of 3-D points onto 2-D canvas
-                const sx = ((1 - (p.x / (s.brushSize * 0 + 3) * 0.5 + 0.5)) * W).toFixed(1);
+                const sx = ((1 - (p.x / 3 * 0.5 + 0.5)) * W).toFixed(1);
                 const sy = ((1 - (p.y / 3 * 0.5 + 0.5)) * H).toFixed(1);
                 return `${i === 0 ? 'M' : 'L'}${sx} ${sy}`;
             }).join(' ');

@@ -78,7 +78,7 @@ export class VoiceCommands {
         // ── Tools ───────────────────────────────────────────────────────────────
         if (/\bmarker\b/.test(t))                       { this.onCommand({ action: 'set_tool', value: 'marker' }); return; }
         if (/\bbrush\b/.test(t))                        { this.onCommand({ action: 'set_tool', value: 'brush'  }); return; }
-        if (/\beraser?\b/.test(t))                      { this.onCommand({ action: 'set_tool', value: 'eraser' }); return; }
+        if (/\beraser\b/.test(t))                       { this.onCommand({ action: 'set_tool', value: 'eraser' }); return; }
         if (/\bpen\b/.test(t))                          { this.onCommand({ action: 'set_tool', value: 'pen'    }); return; }
 
         // ── Actions ─────────────────────────────────────────────────────────────

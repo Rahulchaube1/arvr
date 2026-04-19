@@ -200,7 +200,7 @@ export class DrawingEngine {
 
     _finaliseStroke(pts, color, brushSize, brushType) {
         const stroke = {
-            id:        `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            id:        `${Date.now()}_${this._secureRandHex(6)}`,
             points:    pts.map(p => ({ x: p.x, y: p.y, z: p.z })),
             color,
             brushSize,
@@ -326,5 +326,11 @@ export class DrawingEngine {
         if (len2 === 0) return p.distanceTo(a);
         const t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / len2));
         return p.distanceTo(a.clone().add(ab.multiplyScalar(t)));
+    }
+
+    _secureRandHex(len) {
+        const buf = new Uint8Array(len);
+        crypto.getRandomValues(buf);
+        return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
     }
 }

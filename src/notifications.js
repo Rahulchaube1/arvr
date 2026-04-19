@@ -55,6 +55,9 @@ export class NotificationSystem {
             wordBreak: 'break-word',
         });
         toast.textContent = `${icon}  ${message}`;
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+        toast.setAttribute('tabindex', '0');
         this.container.appendChild(toast);
 
         requestAnimationFrame(() => { toast.style.transform = 'translateX(0)'; });
@@ -66,6 +69,9 @@ export class NotificationSystem {
         };
         setTimeout(dismiss, duration);
         toast.addEventListener('click', dismiss);
+        toast.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dismiss(); }
+        });
     }
 
     info(msg, ms)    { this.show(msg, 'info',    ms); }

@@ -23,8 +23,8 @@ export class CollaborationManager {
         this.drawing   = drawingEngine;
         this.onEvent   = onEvent;
 
-        this.userId    = 'u_' + Math.random().toString(36).slice(2, 10);
-        this.userName  = `User ${Math.floor(Math.random() * 9000) + 1000}`;
+        this.userId    = 'u_' + this._secureRandHex(8);
+        this.userName  = `User ${this._secureRandInt(1000, 9999)}`;
         this.userColor = this._randomColor();
 
         this.roomId    = null;
@@ -114,7 +114,7 @@ export class CollaborationManager {
                 // Small random delay to avoid all tabs replying simultaneously
                 setTimeout(() => {
                     this._send({ type: 'sync_data', scene: this.drawing.serialize() });
-                }, Math.random() * 400 + 50);
+                }, this._secureRandInt(50, 450));
                 break;
 
             case 'sync_data':
@@ -152,6 +152,21 @@ export class CollaborationManager {
 
     _randomColor() {
         const palette = [0xff3b30, 0x007aff, 0x34c759, 0xffcc00, 0xaf52de, 0xff9500, 0xff2d55, 0x5ac8fa];
-        return palette[Math.floor(Math.random() * palette.length)];
+        return palette[this._secureRandInt(0, palette.length - 1)];
+    }
+
+    /** Generate a hex string of `len` bytes using the Web Crypto API. */
+    _secureRandHex(len) {
+        const buf = new Uint8Array(len);
+        crypto.getRandomValues(buf);
+        return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    /** Uniform integer in [min, max] using the Web Crypto API. */
+    _secureRandInt(min, max) {
+        const range = max - min + 1;
+        const buf   = new Uint32Array(1);
+        crypto.getRandomValues(buf);
+        return min + (buf[0] % range);
     }
 }

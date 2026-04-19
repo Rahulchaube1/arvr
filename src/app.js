@@ -504,13 +504,16 @@ class GMDrawApp {
             },
 
             saveSession: async () => {
-                const name = prompt('Session name:') || `Session ${Date.now()}`;
+                const name = await this._inputModal('Session name:', `Session ${Date.now()}`);
+                if (name === null) return; // cancelled
                 await this.persistence?.saveSession(name, name);
                 this.notify.success(`💾 Saved "${name}"`);
             },
 
             joinRoom: async () => {
-                const code = (prompt('Room code (leave blank for random):') || this._randomCode()).toUpperCase();
+                const input = await this._inputModal('Room code (leave blank for random):', '');
+                if (input === null) return; // cancelled
+                const code = (input.trim() || this._randomCode()).toUpperCase();
                 this.collab?.joinRoom(code);
                 document.getElementById('room-code').textContent  = code;
                 document.getElementById('collab-status').classList.remove('hidden');
@@ -540,9 +543,69 @@ class GMDrawApp {
     }
 
     _randomCode() {
-        return Math.random().toString(36).slice(2, 8).toUpperCase();
+        const buf = new Uint8Array(4);
+        crypto.getRandomValues(buf);
+        return Array.from(buf, b => b.toString(36).padStart(2, '0')).join('').slice(0, 6).toUpperCase();
     }
-}
+
+    /**
+     * Accessible custom modal for single-line text input.
+     * Resolves with the entered string, or null if cancelled.
+     * @param {string} label
+     * @param {string} defaultValue
+     * @returns {Promise<string|null>}
+     */
+    _inputModal(label, defaultValue = '') {
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.setAttribute('aria-label', label);
+            Object.assign(overlay.style, {
+                position: 'fixed', inset: '0', zIndex: '10000',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+            });
+
+            overlay.innerHTML = `
+                <div style="background:rgba(15,23,42,0.96);border:1px solid rgba(255,255,255,0.12);
+                    border-radius:16px;padding:24px 28px;min-width:280px;max-width:90vw;
+                    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#fff;">
+                    <label id="_modal_lbl" style="display:block;font-size:14px;color:rgba(255,255,255,0.8);margin-bottom:10px;">${label}</label>
+                    <input id="_modal_inp" type="text"
+                        aria-labelledby="_modal_lbl"
+                        style="width:100%;padding:8px 12px;background:rgba(255,255,255,0.08);
+                            border:1px solid rgba(255,255,255,0.2);border-radius:10px;
+                            color:#fff;font-size:14px;outline:none;box-sizing:border-box;"
+                        value="${defaultValue.replace(/"/g, '&quot;')}" />
+                    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+                        <button id="_modal_cancel"
+                            style="padding:8px 18px;background:rgba(255,255,255,0.08);
+                                border:none;border-radius:10px;color:rgba(255,255,255,0.7);
+                                cursor:pointer;font-size:13px;">Cancel</button>
+                        <button id="_modal_ok"
+                            style="padding:8px 18px;background:#007aff;
+                                border:none;border-radius:10px;color:#fff;
+                                cursor:pointer;font-size:13px;font-weight:600;">OK</button>
+                    </div>
+                </div>`;
+
+            document.body.appendChild(overlay);
+            const inp    = overlay.querySelector('#_modal_inp');
+            const okBtn  = overlay.querySelector('#_modal_ok');
+            const canBtn = overlay.querySelector('#_modal_cancel');
+            inp.focus();
+            inp.select();
+
+            const close = val => { overlay.remove(); resolve(val); };
+            okBtn.addEventListener('click',  () => close(inp.value));
+            canBtn.addEventListener('click', () => close(null));
+            inp.addEventListener('keydown', e => {
+                if (e.key === 'Enter')  close(inp.value);
+                if (e.key === 'Escape') close(null);
+            });
+        });
+    }
 
 // Bootstrap
 const app = new GMDrawApp();

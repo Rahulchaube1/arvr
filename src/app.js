@@ -607,6 +607,8 @@ class GMDrawApp {
         });
     }
 
+}
+
 // Bootstrap
 const app = new GMDrawApp();
 document.getElementById('start-btn').addEventListener('click', () => app.start());

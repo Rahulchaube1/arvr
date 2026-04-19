@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMDraw - Spatial AR Drawing</title>
+    
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js for 3D Rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- MediaPipe for Hand Tracking (AI Computer Vision) -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* The webcam feed acting as our AR background */
+        #webcam-video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            object-fit: cover;
+            z-index: 1;
+            transform: scaleX(-1); /* Mirror the video for intuitive interaction */
+        }
+
+        /* The 3D Canvas overlaid on the video */
+        #ar-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 5;
+            pointer-events: none; /* Let clicks pass through to UI */
+        }
+
+        /* UI Layer */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 10;
+            pointer-events: none; /* Only interactive elements will capture clicks */
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- AR Video Background -->
+    <video id="webcam-video" autoplay playsinline></video>
+    
+    <!-- 3D Rendering Canvas -->
+    <canvas id="ar-canvas"></canvas>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer" class="flex flex-col justify-between p-6">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-start interactive">
+            <div>
+                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">GMDraw</h1>
+                <p class="text-sm text-gray-300">Spatial AI Drawing Platform</p>
+            </div>
+            
+            <div id="status-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/50 flex items-center gap-2">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                </span>
+                Initializing AI...
+            </div>
+        </div>
+
+        <!-- Controls (Bottom) -->
+        <div class="flex justify-center interactive pb-4">
+            <div id="toolbar" class="glass-panel hidden rounded-2xl p-4 flex items-center gap-6 shadow-2xl transition-all duration-300 transform translate-y-10 opacity-0">
+                
+                <!-- Tools -->
+                <div class="flex flex-col gap-1 items-center">
+                    <span class="text-xs text-gray-400 mb-1 uppercase tracking-wider">Color</span>
+                    <div class="flex gap-2">
+                        <button class="w-8 h-8 rounded-full bg-red-500 border-2 border-white shadow-lg transform hover:scale-110 transition-transform" onclick="setColor(0xff3b30)"></button>
+                        <button class="w-8 h-8 rounded-full bg-blue-500 border-2 border-transparent shadow-lg transform hover:scale-110 transition-transform" onclick="setColor(0x007aff)"></button>
+                        <button class="w-8 h-8 rounded-full bg-green-500 border-2 border-transparent shadow-lg transform hover:scale-110 transition-transform" onclick="setColor(0x34c759)"></button>
+                        <button class="w-8 h-8 rounded-full bg-yellow-400 border-2 border-transparent shadow-lg transform hover:scale-110 transition-transform" onclick="setColor(0xffcc00)"></button>
+                        <button class="w-8 h-8 rounded-full bg-white border-2 border-transparent shadow-lg transform hover:scale-110 transition-transform" onclick="setColor(0xffffff)"></button>
+                    </div>
+                </div>
+
+                <div class="w-px h-10 bg-gray-600/50 mx-2"></div>
+
+                <!-- AI Toggles & Actions -->
+                <div class="flex gap-4">
+                    <label class="flex flex-col items-center cursor-pointer gap-2">
+                        <span class="text-xs text-gray-400 uppercase tracking-wider">AI Smooth</span>
+                        <div class="relative">
+                            <input type="checkbox" id="ai-smooth-toggle" class="sr-only" checked onchange="toggleSmoothing()">
+                            <div class="block bg-gray-700 w-10 h-6 rounded-full"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform translate-x-4 bg-blue-400"></div>
+                        </div>
+                    </label>
+
+                    <button onclick="clearCanvas()" class="flex flex-col items-center gap-1 group">
+                        <span class="text-xs text-gray-400 group-hover:text-red-400 transition-colors uppercase tracking-wider">Clear Space</span>
+                        <div class="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </div>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+        
+        <!-- Instructions Overlay (Initial) -->
+        <div id="start-overlay" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 interactive backdrop-blur-sm">
+            <div class="glass-panel p-8 rounded-2xl max-w-md text-center">
+                <h2 class="text-2xl font-bold mb-4">Welcome to GMDraw AR</h2>
+                <p class="text-gray-300 mb-6">Hold your hand up to the camera. Pinch your index finger and thumb together to draw in 3D space.</p>
+                <button id="start-btn" class="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl font-bold text-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                    Enable Camera & Start
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Toggle CSS Logic -->
+    <style>
+        input:checked ~ .dot { transform: translateX(100%); background-color: #60a5fa; }
+        input:checked ~ .block { background-color: #1e3a8a; }
+    </style>
+
+    <script>
+        // --- 1. GLOBAL STATE & CONFIG ---
+        let isDrawing = false;
+        let currentColor = 0xff3b30; // Default Red
+        let applySmoothing = true;
+        
+        // Drawing data structures
+        let lines = []; // Store all drawn lines to manage them
+        let currentLine = null;
+        let currentPoints = [];
+
+        // --- 2. THREE.JS AR ENVIRONMENT SETUP ---
+        const canvasElement = document.getElementById('ar-canvas');
+        
+        // Setup Scene, Camera, Renderer
+        const scene = new THREE.Scene();
+        // Perspective camera simulates the human eye / webcam view
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.z = 0; // Camera is at origin
+
+        const renderer = new THREE.WebGLRenderer({ canvas: canvasElement, alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // Add a visual cursor (a small glowing sphere at the fingertip)
+        const cursorGeometry = new THREE.SphereGeometry(0.02, 16, 16);
+        const cursorMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+        const cursor = new THREE.Mesh(cursorGeometry, cursorMaterial);
+        scene.add(cursor);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Main Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 3. DRAWING LOGIC ---
+
+        function createLine() {
+            const material = new THREE.LineBasicMaterial({
+                color: currentColor,
+                linewidth: 5, // Note: WebGL standard restricts linewidth to 1 on most platforms, but we request 5.
+                linecap: 'round',
+                linejoin: 'round'
+            });
+            const geometry = new THREE.BufferGeometry();
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+            lines.push(line);
+            return line;
+        }
+
+        // Helper to convert 2D screen coordinate from MediaPipe to 3D Space
+        function get3DCoordinate(x, y, z) {
+            // MediaPipe x,y are normalized [0,1]. Top-left is 0,0.
+            // Because video is mirrored horizontally, we flip X calculation.
+            const ndcX = -(x - 0.5) * 2; 
+            const ndcY = -(y - 0.5) * 2; 
+            
+            // Create a vector in Normalized Device Coordinates (NDC)
+            const vec = new THREE.Vector3(ndcX, ndcY, 0.5);
+            
+            // Unproject it back into the 3D world based on camera
+            vec.unproject(camera);
+            
+            // Calculate direction from camera to the vector
+            const dir = vec.sub(camera.position).normalize();
+            
+            // Draw at a fixed distance from the camera. 
+            // In a full SLAM system, this would map to a detected plane or real depth.
+            // We'll use a fixed distance of 3 units away for this prototype.
+            const distance = 3; 
+            return camera.position.clone().add(dir.multiplyScalar(distance));
+        }
+
+        // --- 4. AI SHAPE CORRECTION (Catmull-Rom Spline Smoothing) ---
+        function smoothStroke(lineObj, points) {
+            if (!applySmoothing || points.length < 4) return; // Need enough points to smooth
+            
+            // Create a 3D curve from the rough hand-drawn points
+            const curve = new THREE.CatmullRomCurve3(points);
+            curve.curveType = 'chordal'; // 'centripetal', 'chordal' or 'catmullrom'
+            
+            // Sample the curve to get smooth points (interpolate missing gaps, smooth jagged edges)
+            const smoothPoints = curve.getPoints(points.length * 2);
+            
+            // Update the geometry with smooth points
+            lineObj.geometry.setFromPoints(smoothPoints);
+        }
+
+        // --- 5. MEDIAPIPE AI HAND TRACKING ---
+        const videoElement = document.getElementById('webcam-video');
+        
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                // Get the first detected hand
+                const landmarks = results.multiHandLandmarks[0];
+                
+                // Index Finger Tip (Landmark 8) and Thumb Tip (Landmark 4)
+                const indexTip = landmarks[8];
+                const thumbTip = landmarks[4];
+
+                // Calculate distance between thumb and index to detect "Pinch" gesture
+                const dx = indexTip.x - thumbTip.x;
+                const dy = indexTip.y - thumbTip.y;
+                const dz = indexTip.z - thumbTip.z;
+                const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                
+                // Threshold for pinch (tune this based on testing)
+                const isPinching = distance < 0.05;
+
+                // Map 2D index tip to 3D space
+                const pos3D = get3DCoordinate(indexTip.x, indexTip.y, indexTip.z);
+                
+                // Update 3D Cursor position
+                cursor.position.copy(pos3D);
+
+                // Drawing State Machine
+                if (isPinching) {
+                    // Visual feedback for cursor
+                    cursor.scale.set(1.5, 1.5, 1.5);
+                    cursor.material.color.setHex(currentColor);
+
+                    if (!isDrawing) {
+                        // Start new stroke
+                        isDrawing = true;
+                        currentPoints = [];
+                        currentLine = createLine();
+                    }
+                    // Continue stroke
+                    currentPoints.push(pos3D);
+                    currentLine.geometry.setFromPoints(currentPoints);
+                    
+                } else {
+                    // Visual feedback for cursor
+                    cursor.scale.set(1, 1, 1);
+                    cursor.material.color.setHex(0xffffff);
+
+                    if (isDrawing) {
+                        // End stroke
+                        isDrawing = false;
+                        // Apply AI Smoothing when stroke finishes
+                        smoothStroke(currentLine, currentPoints);
+                        currentLine = null;
+                        currentPoints = [];
+                    }
+                }
+            } else {
+                // No hands detected, hide cursor
+                cursor.position.set(0, 0, 1000); // move out of view
+                if (isDrawing) {
+                    isDrawing = false;
+                    if(currentLine) smoothStroke(currentLine, currentPoints);
+                }
+            }
+        }
+
+        // Initialize MediaPipe Hands model
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+        
+        hands.setOptions({
+            maxNumHands: 1, // Track 1 hand for performance
+            modelComplexity: 1, // 0 is fast, 1 is balanced, 2 is accurate
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
+        });
+        
+        hands.onResults(onResults);
+
+        // --- 6. UI & CAMERA INITIALIZATION ---
+        const startBtn = document.getElementById('start-btn');
+        const startOverlay = document.getElementById('start-overlay');
+        const toolbar = document.getElementById('toolbar');
+        const statusBadge = document.getElementById('status-badge');
+
+        startBtn.addEventListener('click', async () => {
+            startBtn.innerHTML = "Accessing Camera...";
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user', width: 1280, height: 720 } 
+                });
+                videoElement.srcObject = stream;
+                
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    
+                    // Initialize the Camera tracking loop
+                    const cameraUtils = new Camera(videoElement, {
+                        onFrame: async () => {
+                            await hands.send({image: videoElement});
+                        },
+                        width: 1280,
+                        height: 720
+                    });
+                    cameraUtils.start();
+
+                    // Update UI
+                    startOverlay.classList.add('hidden');
+                    toolbar.classList.remove('hidden', 'translate-y-10', 'opacity-0');
+                    statusBadge.innerHTML = `<span class="h-2 w-2 rounded-full bg-green-500 mr-2"></span> AR Active`;
+                    statusBadge.className = "px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-300 border border-green-500/50 flex items-center";
+                };
+            } catch (err) {
+                console.error("Camera access denied:", err);
+                startBtn.innerHTML = "Camera Access Denied";
+                startBtn.classList.replace('bg-gradient-to-r', 'bg-red-600');
+            }
+        });
+
+        // --- 7. UI INTERACTION FUNCTIONS ---
+        window.setColor = function(hexColor) {
+            currentColor = hexColor;
+            
+            // Update button UI to show active color
+            const buttons = document.querySelectorAll('#toolbar button');
+            buttons.forEach(btn => {
+                if(btn.onclick.toString().includes(hexColor)) {
+                    btn.classList.replace('border-transparent', 'border-white');
+                } else {
+                    btn.classList.replace('border-white', 'border-transparent');
+                }
+            });
+        };
+
+        window.clearCanvas = function() {
+            // Remove all lines from the scene
+            lines.forEach(line => {
+                scene.remove(line);
+                line.geometry.dispose();
+                line.material.dispose();
+            });
+            lines = [];
+        };
+
+        window.toggleSmoothing = function() {
+            applySmoothing = !applySmoothing;
+        };
+
+    </script>
+</body>
+</html>
